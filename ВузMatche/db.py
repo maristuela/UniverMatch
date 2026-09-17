@@ -506,3 +506,67 @@ def delete_swipe(user_id: int, program_id: int):
         """, (user_id_db, program_id))
     finally:
         conn.close()
+
+def get_likes_breakdown(user_id: int) -> dict:
+    """
+    Считает статистику лайков пользователя:
+      by_university: {university_name: count}
+      by_code: {specialty_code: count}
+      by_specialty_name: {specialty_name: count}
+      by_city: {city: count}
+      by_tag: {tag: count}
+      total_likes: int
+    """
+    conn = get_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT
+                u.short_name AS university,
+                u.city,
+                s.code  AS specialty_code,
+                s.name  AS specialty_name,
+                p.tags
+            FROM dbo.favorites f
+            JOIN dbo.programs p ON p.id = f.program_id
+            JOIN dbo.universities u ON u.id = p.university_id
+            LEFT JOIN dbo.specialties s ON s.id = p.specialty_id
+            JOIN dbo.users us ON us.id = f.user_id
+            WHERE us.vk_id = ?
+        """, (user_id,))
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    import json
+    by_university: dict = {}
+    by_code: dict = {}
+    by_specialty_name: dict = {}
+    by_city: dict = {}
+    by_tag: dict = {}
+
+    for university, city, code, spec_name, tags_json in rows:
+        if university:
+            by_university[university] = by_university.get(university, 0) + 1
+        if city:
+            by_city[city] = by_city.get(city, 0) + 1
+        if code:
+            by_code[code] = by_code.get(code, 0) + 1
+            if spec_name:
+                by_specialty_name[spec_name] = by_specialty_name.get(spec_name, 0) + 1
+        try:
+            tags = json.loads(tags_json) if tags_json else []
+        except Exception:
+            tags = []
+        for t in tags:
+            by_tag[t] = by_tag.get(t, 0) + 1
+
+    return {
+        "by_university": by_university,
+        "by_code": by_code,
+        "by_specialty_name": by_specialty_name,
+        "by_city": by_city,
+        "by_tag": by_tag,
+        "total_likes": len(rows),
+    }
+
