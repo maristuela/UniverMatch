@@ -15,14 +15,13 @@ def load(mx = 10000):
             page.click(".morediv")
             time.sleep(3 + (random() - 0.5) * 2)
         except:
-            print("Кнопка больше не появилась")
             break
 
 with open("database.json", "w") as f:
     f.write("[\n")
 
 with sync_playwright() as p:
-    browser = p.chromium.launch(headless=True)
+    browser = p.chromium.launch(headless=False)
     page = browser.new_page()
     page.goto("https://tabiturient.ru/globalrating/")
 
@@ -35,14 +34,14 @@ with sync_playwright() as p:
         id = prod.find("div", class_="vuzlogotop100").find("img")["src"]
         id = id[id.rfind('/') + 1:].split('.')[0]
         shortName = prod.find("b").text
-        longName = prod.select_one("[valign=\"center\"]").find_all("span", class_="font1")[-1].text
+        longName = prod.select_one("[valign=\"center\"]").find_all("span", class_="font2")[1].find("b").text
         longName = longName.strip()
         vuzIds.append((id, longName))
         with open("NewFile.txt", "a") as file:
             file.write(longName + ' ' + id + ' \n')
 
 
-    shuffle(vuzIds)
+    #shuffle(vuzIds)
 
     shortages = {
         "РЯ": "Русский язык",
@@ -65,6 +64,7 @@ with sync_playwright() as p:
         load()
         html_content = page.content()
         soup = BeautifulSoup(html_content, "html.parser")
+        print(vuzLong)
 
         vuzId += 1
 
@@ -84,49 +84,57 @@ with sync_playwright() as p:
             "ДЭ" : "dvi"
         }
         for block in soup.find_all("div", class_="mobpaddcard"):
-            lst = []
-            font2 = block.find_all("span", class_="font2")
-            progName1 = font2[0].text
-            progName2 = font2[2].text
-            progName2 = progName2[progName2.find(': ') + 2:]
-            progName = None
-            if progName1 != progName2:
-                progName = progName1 + ' (' + progName2 + ')'
-            else:
-                progName = progName1
-            subjTables = block.find_all("table", class_="cirfloat")
-            subj1 = []
-            for el in subjTables:
-                subj1.append('|'.join(x.text for x in el.find("td").find_all("b")))
-            for i, el in enumerate(subj1):
-                if el[0].isdigit() or el in ["new", "БВИ", "Нет"]:
-                    break
-            if not el[0].isdigit():
-                continue
-            subj = []
-            for el in subj1[:i]:
-                if '|' in el:
-                    subj.append('|'.join(site_abbreviations[x] for x in el.split('|')))
+            try:
+                lst = []
+                font2 = block.find_all("span", class_="font2")
+                progName1 = font2[0].text
+                if progName1 == "Дизайн":
+                    pass
+                progName2 = font2[2].text
+                progName2 = progName2[progName2.find(': ') + 2:]
+                progName = None
+                if progName1 != progName2:
+                    progName = progName1 + ' (' + progName2 + ')'
                 else:
-                    subj.append(site_abbreviations[el])
-            ball = int(subj1[i])
-            del subj1
+                    progName = progName1
+                subjTables = block.find_all("table", class_="cirfloat")
+                subj1 = []
+                for el in subjTables:
+                    subj1.append('|'.join(x.text for x in el.find("td").find_all("b")))
+                for i, el in enumerate(subj1):
+                    if el[0].isdigit() or el in ["new", "БВИ", "Нет"]:
+                        break
+                if not el[0].isdigit():
+                    continue
+                subj = []
+                for el in subj1[:i]:
+                    if '|' in el:
+                        subj.append('|'.join(site_abbreviations[x] for x in el.split('|')))
+                    else:
+                        subj.append(site_abbreviations[el])
+                ball = int(subj1[i])
+                del subj1
 
-            vuzSite = soup.find("div", class_="obram").find("a")["href"]
+                vuzSite = soup.find("div", class_="obram").find("a")["href"]
 
-            dict = {
-                "name" : vuzLong,
-                "program" : progName,
-                "city" : city,
-                "exams" : subj,
-                "min_score" : ball,
-                "url" : vuzSite
-            }
+                dict = {
+                    "name" : vuzLong,
+                    "program" : progName,
+                    "city" : city,
+                    "exams" : subj,
+                    "min_score" : ball,
+                    "url" : vuzSite
+                }
 
-            with open("database.json", "a", encoding="utf-8") as f:
-                curJson = json.dumps(dict, ensure_ascii=False, indent=4)
-                f.write(curJson + ",\n")
+                with open("database.json", "a", encoding="utf-8") as f:
+                    curJson = json.dumps(dict, ensure_ascii=False, indent=4)
+                    f.write(curJson + ",\n")
+            except:
+                continue
 
-            pass
+    finalText = None
+    with open("database.json", "r", encoding="utf-8") as f:
+        finalText = f.read()
 
-    f.write("]")
+    with open("database.json", "w", encoding="utf-8") as f:
+        f.write(finalText[:-2] + '\n]')

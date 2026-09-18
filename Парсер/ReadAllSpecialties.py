@@ -4,6 +4,13 @@ from bs4 import BeautifulSoup
 from random import random
 import re
 
+# ! Make sure that have playwright package installed with Chromium support:
+# ! If not, installation is simple:
+'''
+npm playwright install
+playwright install chromium
+'''
+
 def clean_text(text):
     cyrillic_only = re.sub(r'[^а-яёА-ЯЁ]', '', text)
     return cyrillic_only.lower()
